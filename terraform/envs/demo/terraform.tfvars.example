@@ -1,0 +1,37 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: MIT-0
+#
+# Copy to terraform.tfvars and fill in.
+agent_space_region    = "us-east-1"        # Region of the AWS DevOps Agent Agent Space
+connect_region        = "us-east-1"        # Region of the Amazon Connect instance
+aws_profile           = null               # or a named profile; null = default credential chain
+prefix                = "devops-oncall"
+agent_space_id        = "<agent-space-id>"
+# Existing Connect instance (default):
+connect_instance_id   = "<connect-instance-id>"
+connect_source_number = "+<claimed-number>"
+# Or a new instance with a claimed number (remove the two lines above):
+# create_connect_instance    = true
+# connect_instance_alias     = "<unique-alias>"   # access URL <alias>.my.connect.aws
+# connect_phone_country_code = "US"               # some countries need regulatory documents first
+# connect_phone_type         = "DID"              # or TOLL_FREE
+# language            = "en-US"            # en-US | fr-FR (files in src/locales)
+# dry_run             = true               # set to false to place real calls (needs enable_pin = true, or allow_live_without_pin = true)
+# allow_live_without_pin = false           # true: live calls without the PIN gate, sandbox demo only (you are the only callee)
+# enable_replay       = false              # true creates the scripts/replay.py rules; set true only for the demo, then back to false
+# deletion_protection = false              # true to protect the ticket table
+# Not acknowledged by voice (1 not pressed, or call never answered): written notification, each
+# channel off when null. Connect Region.
+# sms_origination_identity_arn = "arn:aws:sms-voice:<region>:<account>:phone-number/<id>"  # or pool / sender-id
+# notify_email_from            = "oncall@example.com"   # SES verified address (the address or its domain is verified)
+#   recipient: SSM SecureString /<prefix>/oncall-email, set outside IaC (see README)
+# gate_timeout_seconds         = 8   # wait for 1 after the opening announcement
+# gate_retry_timeout_seconds   = 5   # wait for 1 after the short second prompt
+# enable_call_recording       = false # true records the call; the flow then plays a recording notice first
+# enable_flow_logging         = false # true turns on Connect flow logging (logs the short incident context, not the summary); keep false for privacy
+# enable_ai_guardrail         = true  # false detaches the sample's AWS::Wisdom::AIGuardrail (prompt-attack, harmful-content); leave true unless a guardrail is managed centrally
+# enable_pin                  = false # true: ask the callee for a DTMF PIN after they press 1 (recipient gate)
+#   PIN: SSM SecureString /<prefix>/oncall-pin, set outside IaC; keep enable_flow_logging = false while this is true
+# pin_max_digits              = 6     # max DTMF digits accepted for the PIN
+# pin_timeout_seconds         = 10    # seconds to wait for the PIN on each of the two attempts
+# ack_confirm_timeout_seconds = 5     # wait for 1 after the AI agent's acknowledgment (no 1: not acknowledged)

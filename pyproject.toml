@@ -1,0 +1,25 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: MIT-0
+
+[project]
+name = "devops-agent-oncall-connect"
+version = "0.1.0"
+description = "AWS DevOps Agent investigations that call the on-call engineer with Amazon Connect"
+requires-python = ">=3.13"
+license = "MIT-0"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 145
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "S"]
+ignore = ["S101"]  # assert is fine in tests
+
+[tool.ruff.lint.per-file-ignores]
+"scripts/**" = ["S603", "S607"]  # scripts shell out to the AWS CLI on purpose
+"terraform/**" = ["S603", "S607"]
+"tests/**" = ["S105", "S106"]

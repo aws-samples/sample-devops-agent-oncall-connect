@@ -1,0 +1,14 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: MIT-0
+#
+# Local developer and CI tooling. The hash-locked requirements-dev.txt is compiled from this file:
+#   uv pip compile requirements-dev.in --universal --python-version 3.13 --generate-hashes -o requirements-dev.txt
+# Install with: pip install --require-hashes -r requirements-dev.txt
+# The runtime Lambda dependencies are locked separately (src/layers/boto3, src/mcp_server).
+pytest==9.0.3
+ruff==0.13.3
+boto3==1.43.106
+mcp==1.30.0
+bandit==1.8.6
+detect-secrets==1.5.0
+pip-audit==2.10.1

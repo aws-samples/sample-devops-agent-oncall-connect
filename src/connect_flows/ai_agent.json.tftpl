@@ -1,0 +1,724 @@
+{
+  "Version": "2019-10-30",
+  "StartAction": "${enable_flow_logging ? "logs-on" : "lang"}",
+  "Actions": [
+%{ if enable_flow_logging ~}
+    {
+      "Identifier": "logs-on",
+      "Type": "UpdateFlowLoggingBehavior",
+      "Parameters": {
+        "FlowLoggingBehavior": "Enabled"
+      },
+      "Transitions": {
+        "NextAction": "lang"
+      }
+    },
+%{ endif ~}
+    {
+      "Identifier": "lang",
+      "Type": "UpdateContactData",
+      "Parameters": {
+        "LanguageCode": ${jsonencode(connect_language)}
+      },
+      "Transitions": {
+        "NextAction": "voice",
+        "Errors": [
+          {
+            "NextAction": "voice",
+            "ErrorType": "NoMatchingError"
+          }
+        ]
+      }
+    },
+    {
+      "Identifier": "voice",
+      "Type": "UpdateContactTextToSpeechVoice",
+      "Parameters": {
+        "TextToSpeechVoice": ${jsonencode(voice)},
+        "TextToSpeechEngine": "Neural"
+      },
+      "Transitions": {
+        "NextAction": "${enable_call_recording ? "rec-notice" : "gate"}",
+        "Errors": [
+          {
+            "NextAction": "${enable_call_recording ? "rec-notice" : "gate"}",
+            "ErrorType": "NoMatchingError"
+          }
+        ]
+      }
+    },
+%{ if enable_call_recording ~}
+    {
+      "Identifier": "rec-notice",
+      "Type": "MessageParticipant",
+      "Parameters": {
+        "Text": ${jsonencode(messages.recording_notice)}
+      },
+      "Transitions": {
+        "NextAction": "rec-on",
+        "Errors": [
+          {
+            "NextAction": "gate",
+            "ErrorType": "NoMatchingError"
+          }
+        ]
+      }
+    },
+    {
+      "Identifier": "rec-on",
+      "Type": "UpdateContactRecordingBehavior",
+      "Parameters": {
+        "RecordingBehavior": {
+          "RecordedParticipants": [],
+          "IVRRecordingBehavior": "Enabled"
+        }
+      },
+      "Transitions": {
+        "NextAction": "gate"
+      }
+    },
+%{ endif ~}
+    {
+      "Identifier": "gate",
+      "Type": "GetParticipantInput",
+      "Parameters": {
+        "StoreInput": "False",
+        "InputTimeLimitSeconds": "${gate_timeout_seconds}",
+        "Text": ${jsonencode(enable_pin ? messages.gate_pin : messages.gate)}
+      },
+      "Transitions": {
+        "NextAction": "gate-retry",
+        "Conditions": [
+          {
+            "NextAction": "${enable_pin ? "pin" : "ai-session"}",
+            "Condition": {
+              "Operator": "Equals",
+              "Operands": [
+                "1"
+              ]
+            }
+          }
+        ],
+        "Errors": [
+          {
+            "NextAction": "gate-retry",
+            "ErrorType": "InputTimeLimitExceeded"
+          },
+          {
+            "NextAction": "gate-retry",
+            "ErrorType": "NoMatchingCondition"
+          },
+          {
+            "NextAction": "notify",
+            "ErrorType": "NoMatchingError"
+          }
+        ]
+      }
+    },
+    {
+      "Identifier": "gate-retry",
+      "Type": "GetParticipantInput",
+      "Parameters": {
+        "StoreInput": "False",
+        "InputTimeLimitSeconds": "${gate_retry_timeout_seconds}",
+        "Text": ${jsonencode(messages.gate_retry)}
+      },
+      "Transitions": {
+        "NextAction": "notify",
+        "Conditions": [
+          {
+            "NextAction": "${enable_pin ? "pin" : "ai-session"}",
+            "Condition": {
+              "Operator": "Equals",
+              "Operands": [
+                "1"
+              ]
+            }
+          }
+        ],
+        "Errors": [
+          {
+            "NextAction": "notify",
+            "ErrorType": "InputTimeLimitExceeded"
+          },
+          {
+            "NextAction": "notify",
+            "ErrorType": "NoMatchingCondition"
+          },
+          {
+            "NextAction": "notify",
+            "ErrorType": "NoMatchingError"
+          }
+        ]
+      }
+    },
+%{ if enable_pin ~}
+    {
+      "Identifier": "pin",
+      "Type": "GetParticipantInput",
+      "Parameters": {
+        "StoreInput": "True",
+        "InputTimeLimitSeconds": "${pin_timeout_seconds}",
+        "DTMFConfiguration": {
+          "InputTerminationSequence": "#"
+        },
+        "InputValidation": {
+          "CustomValidation": {
+            "MaximumLength": ${pin_max_digits}
+          }
+        },
+        "Text": ${jsonencode(messages.pin_prompt)}
+      },
+      "Transitions": {
+        "NextAction": "pin-check",
+        "Errors": [
+          {
+            "NextAction": "pin-retry",
+            "ErrorType": "InputTimeLimitExceeded"
+          },
+          {
+            "NextAction": "pin-check",
+            "ErrorType": "NoMatchingError"
+          }
+        ]
+      }
+    },
+    {
+      "Identifier": "pin-check",
+      "Type": "InvokeLambdaFunction",
+      "Parameters": {
+        "LambdaFunctionARN": "${handler_arn}",
+        "InvocationTimeLimitSeconds": "5",
+        "LambdaInvocationAttributes": {
+          "action": "verify_pin",
+          "pin": "$.StoredCustomerInput"
+        },
+        "ResponseValidation": {
+          "ResponseType": "STRING_MAP"
+        }
+      },
+      "Transitions": {
+        "NextAction": "pin-result",
+        "Errors": [
+          {
+            "NextAction": "pin-retry",
+            "ErrorType": "NoMatchingError"
+          }
+        ]
+      }
+    },
+    {
+      "Identifier": "pin-result",
+      "Type": "Compare",
+      "Parameters": {
+        "ComparisonValue": "$.External.result"
+      },
+      "Transitions": {
+        "NextAction": "pin-retry",
+        "Conditions": [
+          {
+            "NextAction": "ai-session",
+            "Condition": {
+              "Operator": "Equals",
+              "Operands": [
+                "ok"
+              ]
+            }
+          }
+        ],
+        "Errors": [
+          {
+            "NextAction": "pin-retry",
+            "ErrorType": "NoMatchingCondition"
+          }
+        ]
+      }
+    },
+    {
+      "Identifier": "pin-retry",
+      "Type": "GetParticipantInput",
+      "Parameters": {
+        "StoreInput": "True",
+        "InputTimeLimitSeconds": "${pin_timeout_seconds}",
+        "DTMFConfiguration": {
+          "InputTerminationSequence": "#"
+        },
+        "InputValidation": {
+          "CustomValidation": {
+            "MaximumLength": ${pin_max_digits}
+          }
+        },
+        "Text": ${jsonencode(messages.pin_retry)}
+      },
+      "Transitions": {
+        "NextAction": "pin-check-2",
+        "Errors": [
+          {
+            "NextAction": "pin-ko",
+            "ErrorType": "InputTimeLimitExceeded"
+          },
+          {
+            "NextAction": "pin-check-2",
+            "ErrorType": "NoMatchingError"
+          }
+        ]
+      }
+    },
+    {
+      "Identifier": "pin-check-2",
+      "Type": "InvokeLambdaFunction",
+      "Parameters": {
+        "LambdaFunctionARN": "${handler_arn}",
+        "InvocationTimeLimitSeconds": "5",
+        "LambdaInvocationAttributes": {
+          "action": "verify_pin",
+          "pin": "$.StoredCustomerInput"
+        },
+        "ResponseValidation": {
+          "ResponseType": "STRING_MAP"
+        }
+      },
+      "Transitions": {
+        "NextAction": "pin-result-2",
+        "Errors": [
+          {
+            "NextAction": "pin-ko",
+            "ErrorType": "NoMatchingError"
+          }
+        ]
+      }
+    },
+    {
+      "Identifier": "pin-result-2",
+      "Type": "Compare",
+      "Parameters": {
+        "ComparisonValue": "$.External.result"
+      },
+      "Transitions": {
+        "NextAction": "pin-ko",
+        "Conditions": [
+          {
+            "NextAction": "ai-session",
+            "Condition": {
+              "Operator": "Equals",
+              "Operands": [
+                "ok"
+              ]
+            }
+          }
+        ],
+        "Errors": [
+          {
+            "NextAction": "pin-ko",
+            "ErrorType": "NoMatchingCondition"
+          }
+        ]
+      }
+    },
+    {
+      "Identifier": "pin-ko",
+      "Type": "MessageParticipant",
+      "Parameters": {
+        "Text": ${jsonencode(messages.pin_failed)}
+      },
+      "Transitions": {
+        "NextAction": "notify",
+        "Errors": [
+          {
+            "NextAction": "notify",
+            "ErrorType": "NoMatchingError"
+          }
+        ]
+      }
+    },
+%{ endif ~}
+    {
+      "Identifier": "notify",
+      "Type": "InvokeLambdaFunction",
+      "Parameters": {
+        "LambdaFunctionARN": "${handler_arn}",
+        "InvocationTimeLimitSeconds": "8",
+        "LambdaInvocationAttributes": {
+          "action": "notify",
+          "ticketId": "$.Attributes.ticketId",
+          "service": "$.Attributes.service",
+          "priority": "$.Attributes.priority",
+          "statusText": "$.Attributes.statusText"
+        },
+        "ResponseValidation": {
+          "ResponseType": "STRING_MAP"
+        }
+      },
+      "Transitions": {
+        "NextAction": "sent",
+        "Errors": [
+          {
+            "NextAction": "no-input",
+            "ErrorType": "NoMatchingError"
+          }
+        ]
+      }
+    },
+    {
+      "Identifier": "sent",
+      "Type": "Compare",
+      "Parameters": {
+        "ComparisonValue": "$.External.sent"
+      },
+      "Transitions": {
+        "NextAction": "no-input",
+        "Conditions": [
+          {
+            "NextAction": "no-input-notified",
+            "Condition": {
+              "Operator": "Equals",
+              "Operands": [
+                "notified"
+              ]
+            }
+          }
+        ],
+        "Errors": [
+          {
+            "NextAction": "no-input",
+            "ErrorType": "NoMatchingCondition"
+          }
+        ]
+      }
+    },
+    {
+      "Identifier": "no-input-notified",
+      "Type": "MessageParticipant",
+      "Parameters": {
+        "Text": ${jsonencode(messages.no_input_notified)}
+      },
+      "Transitions": {
+        "NextAction": "end",
+        "Errors": [
+          {
+            "NextAction": "end",
+            "ErrorType": "NoMatchingError"
+          }
+        ]
+      }
+    },
+    {
+      "Identifier": "no-input",
+      "Type": "MessageParticipant",
+      "Parameters": {
+        "Text": ${jsonencode(messages.no_input)}
+      },
+      "Transitions": {
+        "NextAction": "end",
+        "Errors": [
+          {
+            "NextAction": "end",
+            "ErrorType": "NoMatchingError"
+          }
+        ]
+      }
+    },
+    {
+      "Identifier": "ai-session",
+      "Type": "CreateWisdomSession",
+      "Parameters": {
+        "WisdomAssistantArn": "${assistant_arn}"
+      },
+      "Transitions": {
+        "NextAction": "init",
+        "Errors": [
+          {
+            "NextAction": "fallback",
+            "ErrorType": "NoMatchingError"
+          }
+        ]
+      }
+    },
+    {
+      "Identifier": "init",
+      "Type": "InvokeLambdaFunction",
+      "Parameters": {
+        "LambdaFunctionARN": "${handler_arn}",
+        "InvocationTimeLimitSeconds": "8",
+        "LambdaInvocationAttributes": {
+          "action": "init",
+          "sessionArn": "$.Wisdom.SessionArn",
+          "ticketId": "$.Attributes.ticketId",
+          "service": "$.Attributes.service",
+          "priority": "$.Attributes.priority",
+          "statusText": "$.Attributes.statusText"
+        },
+        "ResponseValidation": {
+          "ResponseType": "STRING_MAP"
+        }
+      },
+      "Transitions": {
+        "NextAction": "agent",
+        "Errors": [
+          {
+            "NextAction": "fallback",
+            "ErrorType": "NoMatchingError"
+          }
+        ]
+      }
+    },
+    {
+      "Identifier": "agent",
+      "Type": "ConnectParticipantWithLexBot",
+      "Parameters": {
+        "Text": ${jsonencode(messages.greeting)},
+        "LexV2Bot": {
+          "AliasArn": "${lex_alias_arn}"
+        },
+        "LexSessionAttributes": {
+          "x-amz-lex:q-in-connect:ai-agent-arn": "${ai_agent_arn}",
+          "x-amz-lex:q-in-connect:session-arn": "$.Wisdom.SessionArn"
+        }
+      },
+      "Transitions": {
+        "NextAction": "route",
+        "Errors": [
+          {
+            "NextAction": "route",
+            "ErrorType": "NoMatchingCondition"
+          },
+          {
+            "NextAction": "fallback",
+            "ErrorType": "InputTimeLimitExceeded"
+          },
+          {
+            "NextAction": "fallback",
+            "ErrorType": "NoMatchingError"
+          }
+        ]
+      }
+    },
+    {
+      "Identifier": "route",
+      "Type": "Compare",
+      "Parameters": {
+        "ComparisonValue": "$.Lex.SessionAttributes.Tool"
+      },
+      "Transitions": {
+        "NextAction": "bye",
+        "Conditions": [
+          {
+            "NextAction": "ack-confirm",
+            "Condition": {
+              "Operator": "Equals",
+              "Operands": [
+                "Acknowledge"
+              ]
+            }
+          }
+        ],
+        "Errors": [
+          {
+            "NextAction": "bye",
+            "ErrorType": "NoMatchingCondition"
+          }
+        ]
+      }
+    },
+    {
+      "Identifier": "ack-confirm",
+      "Type": "GetParticipantInput",
+      "Parameters": {
+        "StoreInput": "False",
+        "InputTimeLimitSeconds": "${ack_confirm_timeout_seconds}",
+        "Text": ${jsonencode(messages.ack_confirm)}
+      },
+      "Transitions": {
+        "NextAction": "ack-unconfirmed",
+        "Conditions": [
+          {
+            "NextAction": "ack",
+            "Condition": {
+              "Operator": "Equals",
+              "Operands": [
+                "1"
+              ]
+            }
+          }
+        ],
+        "Errors": [
+          {
+            "NextAction": "ack-unconfirmed",
+            "ErrorType": "InputTimeLimitExceeded"
+          },
+          {
+            "NextAction": "ack-unconfirmed",
+            "ErrorType": "NoMatchingCondition"
+          },
+          {
+            "NextAction": "ack-unconfirmed",
+            "ErrorType": "NoMatchingError"
+          }
+        ]
+      }
+    },
+    {
+      "Identifier": "ack-unconfirmed",
+      "Type": "MessageParticipant",
+      "Parameters": {
+        "Text": ${jsonencode(messages.ack_unconfirmed)}
+      },
+      "Transitions": {
+        "NextAction": "end",
+        "Errors": [
+          {
+            "NextAction": "end",
+            "ErrorType": "NoMatchingError"
+          }
+        ]
+      }
+    },
+    {
+      "Identifier": "ack",
+      "Type": "InvokeLambdaFunction",
+      "Parameters": {
+        "LambdaFunctionARN": "${handler_arn}",
+        "InvocationTimeLimitSeconds": "5",
+        "LambdaInvocationAttributes": {
+          "action": "ack",
+          "ticketId": "$.Attributes.ticketId",
+          "note": "$.Lex.SessionAttributes.note"
+        },
+        "ResponseValidation": {
+          "ResponseType": "STRING_MAP"
+        }
+      },
+      "Transitions": {
+        "NextAction": "ack-result",
+        "Errors": [
+          {
+            "NextAction": "ack-ko",
+            "ErrorType": "NoMatchingError"
+          }
+        ]
+      }
+    },
+    {
+      "Identifier": "ack-result",
+      "Type": "Compare",
+      "Parameters": {
+        "ComparisonValue": "$.External.result"
+      },
+      "Transitions": {
+        "NextAction": "ack-ko",
+        "Conditions": [
+          {
+            "NextAction": "ack-ok",
+            "Condition": {
+              "Operator": "Equals",
+              "Operands": [
+                "ok"
+              ]
+            }
+          },
+          {
+            "NextAction": "ack-noop",
+            "Condition": {
+              "Operator": "Equals",
+              "Operands": [
+                "not-open"
+              ]
+            }
+          }
+        ],
+        "Errors": [
+          {
+            "NextAction": "ack-ko",
+            "ErrorType": "NoMatchingCondition"
+          }
+        ]
+      }
+    },
+    {
+      "Identifier": "ack-ok",
+      "Type": "MessageParticipant",
+      "Parameters": {
+        "Text": ${jsonencode(messages.ack_ok)}
+      },
+      "Transitions": {
+        "NextAction": "end",
+        "Errors": [
+          {
+            "NextAction": "end",
+            "ErrorType": "NoMatchingError"
+          }
+        ]
+      }
+    },
+    {
+      "Identifier": "ack-noop",
+      "Type": "MessageParticipant",
+      "Parameters": {
+        "Text": ${jsonencode(messages.ack_noop)}
+      },
+      "Transitions": {
+        "NextAction": "end",
+        "Errors": [
+          {
+            "NextAction": "end",
+            "ErrorType": "NoMatchingError"
+          }
+        ]
+      }
+    },
+    {
+      "Identifier": "ack-ko",
+      "Type": "MessageParticipant",
+      "Parameters": {
+        "Text": ${jsonencode(messages.ack_failed)}
+      },
+      "Transitions": {
+        "NextAction": "end",
+        "Errors": [
+          {
+            "NextAction": "end",
+            "ErrorType": "NoMatchingError"
+          }
+        ]
+      }
+    },
+    {
+      "Identifier": "bye",
+      "Type": "MessageParticipant",
+      "Parameters": {
+        "Text": ${jsonencode(messages.bye)}
+      },
+      "Transitions": {
+        "NextAction": "end",
+        "Errors": [
+          {
+            "NextAction": "end",
+            "ErrorType": "NoMatchingError"
+          }
+        ]
+      }
+    },
+    {
+      "Identifier": "fallback",
+      "Type": "MessageParticipant",
+      "Parameters": {
+        "Text": ${jsonencode(messages.fallback)}
+      },
+      "Transitions": {
+        "NextAction": "end",
+        "Errors": [
+          {
+            "NextAction": "end",
+            "ErrorType": "NoMatchingError"
+          }
+        ]
+      }
+    },
+    {
+      "Identifier": "end",
+      "Type": "DisconnectParticipant",
+      "Parameters": {},
+      "Transitions": {}
+    }
+  ]
+}

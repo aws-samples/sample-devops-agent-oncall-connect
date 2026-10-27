@@ -1,0 +1,71 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/awslabs/automated-security-helper/refs/heads/main/automated_security_helper/schemas/AshConfig.json
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: MIT-0
+#
+# Automated Security Helper (ASH) v3 configuration.
+# https://github.com/awslabs/automated-security-helper
+#
+# Run locally (CI runs its own pinned bandit, detect-secrets, checkov and pip-audit jobs, see
+# .github/workflows/checks.yml):
+#   uv tool install git+https://github.com/awslabs/automated-security-helper.git@v3.7.1
+#   ash --mode local --source-dir . --config .ash/.ash.yaml
+# or with the container image (also runs grype, syft and opengrep):
+#   ash --mode container --source-dir . --config .ash/.ash.yaml
+#
+# Infrastructure and script findings that this sample accepts are justified inline next to the
+# code (#checkov:skip, # nosemgrep, # nosec, # pragma: allowlist secret) so every scanner carries the
+# same reason. Only unit-test patterns are suppressed here, each with a rule id, a path and a reason
+# (ASH 3.7 global_settings.suppressions format: rule_id + path + reason). The fake AWS secret in
+# tests/conftest.py is marked inline for detect-secrets (`# pragma: allowlist secret`).
+project_name: devops-agent-oncall-connect
+
+fail_on_findings: true
+
+global_settings:
+  # Report everything from LOW up; the sample has no accepted High/Critical findings.
+  severity_threshold: LOW
+  ignore_paths:
+    - path: ".ash/ash_output/**"
+      reason: "ASH's own scan output; not source code."
+    - path: "**/.terraform/**"
+      reason: "Downloaded Terraform providers and modules; not this repo's source."
+  suppressions:
+    - rule_id: B101
+      path: "tests/**"
+      reason: "pytest uses assert statements by design."
+    - rule_id: B105
+      path: "tests/conftest.py"
+      reason: "Fake AWS credentials (value 'testing') so boto3 clients can be built in unit tests without AWS access."
+
+scanners:
+  # SAST for the Python Lambdas, scripts and MCP server.
+  bandit:
+    enabled: true
+    options:
+      confidence_level: low
+      severity_threshold: LOW
+  semgrep:
+    enabled: true
+    options:
+      config: "p/ci"
+  # Secret scanning across the whole tree.
+  detect-secrets:
+    enabled: true
+  # IaC scanning for the Terraform under terraform/.
+  checkov:
+    enabled: true
+    options:
+      frameworks: ["terraform", "secrets"]
+  # SBOM (syft) + vulnerability scan (grype) of dependencies.
+  syft:
+    enabled: true
+  grype:
+    enabled: true
+
+  # Disabled: no standalone CloudFormation template, no CDK app, no npm/JS code.
+  cfn-nag:
+    enabled: false  # The only CloudFormation is the Lex bot stack, built in lex.tf and covered by checkov on the Terraform.
+  cdk-nag:
+    enabled: false  # No AWS CDK app in this repo.
+  npm-audit:
+    enabled: false  # No package.json / Node dependencies in this repo.

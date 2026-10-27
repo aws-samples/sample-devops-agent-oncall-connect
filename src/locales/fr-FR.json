@@ -1,0 +1,55 @@
+{
+  "connect_language": "fr-FR",
+  "lex_locale": "fr_FR",
+  "voice": "Lea",
+  "messages": {
+    "gate": "Bonjour, ici l'astreinte DevOps Agent. Un incident de priorité $.Attributes.priority est en cours sur le service $.Attributes.service. Appuyez sur 1 pour parler à l'assistant d'astreinte.",
+    "gate_pin": "Bonjour, ici l'astreinte DevOps Agent. Un incident de priorité $.Attributes.priority est en cours. Appuyez sur 1 pour parler à l'assistant d'astreinte.",
+    "gate_retry": "Appuyez sur 1 pour prendre l'incident.",
+    "pin_prompt": "Entrez votre code PIN d'astreinte, puis appuyez sur dièse.",
+    "pin_retry": "Ce code PIN n'a pas été reconnu. Entrez à nouveau votre code PIN d'astreinte, puis appuyez sur dièse.",
+    "pin_failed": "Le code PIN n'a pas pu être vérifié. Les détails de l'incident sont envoyés au canal d'astreinte. Au revoir.",
+    "greeting": "Ici l'assistant d'astreinte. Vous voulez que je vous résume l'incident ?",
+    "ack_ok": "C'est noté, l'incident est acquitté dans le ticket à votre nom. Bon courage, au revoir.",
+    "ack_noop": "Cet incident n'est plus ouvert, rien n'a été modifié. Au revoir.",
+    "bye": "Très bien, l'incident reste ouvert. Au revoir.",
+    "ack_failed": "L'acquittement n'a pas pu être enregistré. Merci de mettre à jour le ticket manuellement.",
+    "fallback": "Bonjour, ici l'astreinte automatique DevOps Agent. Incident priorité $.Attributes.priority sur le service $.Attributes.service. L'assistant vocal est indisponible, merci de consulter le ticket.",
+    "no_input": "La touche 1 n'a pas été appuyée. L'incident reste ouvert, les détails sont dans le ticket. Au revoir.",
+    "no_input_notified": "La touche 1 n'a pas été appuyée. Les détails de l'incident vous sont envoyés par écrit. Au revoir.",
+    "recording_notice": "Cet appel peut être enregistré à des fins de qualité et de traçabilité.",
+    "ack_confirm": "Pour confirmer que vous prenez l'incident $.Attributes.ticketSpoken, appuyez sur 1.",
+    "ack_unconfirmed": "L'acquittement n'a pas été confirmé. L'incident reste ouvert, consultez le ticket. Au revoir."
+  },
+  "labels": {
+    "status": {
+      "COMPLETED": "terminée",
+      "FAILED": "en échec, aucune cause trouvée",
+      "TIMED_OUT": "expirée, aucune cause trouvée",
+      "CANCELLED": "annulée, aucune cause trouvée",
+      "CANCELED": "annulée, aucune cause trouvée"
+    },
+    "priority": {
+      "CRITICAL": "critique",
+      "HIGH": "haute",
+      "MEDIUM": "moyenne",
+      "LOW": "basse"
+    },
+    "summary_unavailable": "Résumé indisponible.",
+    "unknown": "inconnu",
+    "ack": "acquitté à la voix via l'agent IA Connect",
+    "no_answer": "non acquitté à la voix : la touche 1 n'a pas été appuyée pendant l'appel d'astreinte",
+    "not_connected": "non acquitté à la voix : l'appel d'astreinte n'a pas été décroché",
+    "notified": "notification envoyée par",
+    "notify_sms": "Astreinte : incident {ticketId} de priorité {priority} sur {service}, investigation {statusText}. Non acquitté par téléphone, merci de consulter le ticket.",
+    "notify_email_subject": "[Astreinte] Incident {ticketId} de priorité {priority} sur {service}",
+    "notify_email_body": "L'appel d'astreinte n'a pas été acquitté.\n\nTicket : {ticketId}\nService : {service}\nPriorité : {priority}\nInvestigation : {statusText}\n\nRésumé AWS DevOps Agent :\n{summary}\n",
+    "not_acknowledged": "non acquitté à la voix : l'appel d'astreinte a été décroché mais pas acquitté",
+    "notify_failed": "notification impossible : échec de l'envoi par SMS et par email",
+    "notify_no_budget": "notification non tentée : plus de temps dans cette tentative, elle sera relancée",
+    "ack_receipt_sms": "Astreinte : vous avez acquitté l'incident {ticketId} sur {service} à {ackAt}. Si ce n'était pas vous, consultez le ticket tout de suite.",
+    "ack_receipt_email_subject": "[Astreinte] Vous avez acquitté l'incident {ticketId}",
+    "ack_receipt_email_body": "Vous avez acquitté l'incident {ticketId} par téléphone à {ackAt}.\n\nService : {service}\nPriorité : {priority}\n\nSi ce n'était pas vous, signalez-le dans le chat DevOps Agent et prévenez le canal d'astreinte.\n",
+    "ack_receipt_sent": "accusé d'acquittement envoyé par"
+  }
+}

@@ -1,0 +1,36 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+# Build artifacts (scripts/build.py, Terraform archives)
+build/
+**/.build/
+
+# Terraform: state, plans and local values contain account-specific data
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfplan.*
+terraform.tfvars
+crash.log
+
+# Local evidence of test runs (account ids, payloads)
+/evidence/
+
+.env
+.env.*
+*.pem
+*.key
+**/.aws/
+.DS_Store
+*.log
+
+# ASH scan output
+.ash/ash_output/
+
+# Python packaging metadata
+*.egg-info/

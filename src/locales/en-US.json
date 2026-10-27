@@ -1,0 +1,55 @@
+{
+  "connect_language": "en-US",
+  "lex_locale": "en_US",
+  "voice": "Joanna",
+  "messages": {
+    "gate": "Hello, this is the AWS DevOps Agent on-call line. A priority $.Attributes.priority incident is in progress on service $.Attributes.service. Press 1 to talk to the on-call assistant.",
+    "gate_pin": "Hello, this is the AWS DevOps Agent on-call line. A priority $.Attributes.priority incident is in progress. Press 1 to talk to the on-call assistant.",
+    "gate_retry": "Press 1 to take the incident.",
+    "pin_prompt": "Please enter your on-call PIN, then press pound.",
+    "pin_retry": "That PIN was not recognized. Please enter your on-call PIN again, then press pound.",
+    "pin_failed": "The PIN could not be verified. The incident details are being sent to the on-call channel. Goodbye.",
+    "greeting": "This is the on-call assistant. Do you want me to summarize the incident?",
+    "ack_ok": "Got it, the incident is acknowledged in the ticket under your name. Good luck, goodbye.",
+    "ack_noop": "This incident is no longer open, nothing was changed. Goodbye.",
+    "bye": "All right, the incident stays open. Goodbye.",
+    "ack_failed": "The acknowledgment could not be recorded. Please update the ticket manually.",
+    "fallback": "Hello, this is the AWS DevOps Agent on-call line. Priority $.Attributes.priority incident on service $.Attributes.service. The voice assistant is unavailable, please check the ticket.",
+    "no_input": "Key 1 was not pressed. The incident stays open, the details are in the ticket. Goodbye.",
+    "no_input_notified": "Key 1 was not pressed. The incident details are sent to you in writing. Goodbye.",
+    "recording_notice": "This call may be recorded for quality and record-keeping.",
+    "ack_confirm": "To confirm you take incident $.Attributes.ticketSpoken, press 1.",
+    "ack_unconfirmed": "The acknowledgment was not confirmed. The incident stays open, please check the ticket. Goodbye."
+  },
+  "labels": {
+    "status": {
+      "COMPLETED": "completed",
+      "FAILED": "failed, no root cause found",
+      "TIMED_OUT": "timed out, no root cause found",
+      "CANCELLED": "cancelled, no root cause found",
+      "CANCELED": "cancelled, no root cause found"
+    },
+    "priority": {
+      "CRITICAL": "critical",
+      "HIGH": "high",
+      "MEDIUM": "medium",
+      "LOW": "low"
+    },
+    "summary_unavailable": "Summary unavailable.",
+    "unknown": "unknown",
+    "ack": "acknowledged by voice through the Connect AI agent",
+    "no_answer": "not acknowledged by voice: 1 was not pressed on the on-call call",
+    "not_connected": "not acknowledged by voice: the on-call call was not answered",
+    "notified": "notification sent by",
+    "notify_sms": "On-call: {priority} priority incident {ticketId} on {service}, investigation {statusText}. Not acknowledged by phone, please check the ticket.",
+    "notify_email_subject": "[On-call] {priority} priority incident {ticketId} on {service}",
+    "notify_email_body": "The on-call call was not acknowledged.\n\nTicket: {ticketId}\nService: {service}\nPriority: {priority}\nInvestigation: {statusText}\n\nAWS DevOps Agent summary:\n{summary}\n",
+    "not_acknowledged": "not acknowledged by voice: the on-call call was answered but not acknowledged",
+    "notify_failed": "notification could not be sent: SMS and email both failed",
+    "notify_no_budget": "notification not attempted: no time left in this attempt, it will be retried",
+    "ack_receipt_sms": "On-call: you acknowledged incident {ticketId} on {service} at {ackAt}. If this was not you, check the ticket now.",
+    "ack_receipt_email_subject": "[On-call] You acknowledged incident {ticketId}",
+    "ack_receipt_email_body": "You acknowledged incident {ticketId} by phone at {ackAt}.\n\nService: {service}\nPriority: {priority}\n\nIf this was not you, comment in the DevOps Agent chat and page the on-call channel.\n",
+    "ack_receipt_sent": "acknowledgment receipt sent by"
+  }
+}

@@ -1,0 +1,109 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: MIT-0
+#
+# Static checks only. No AWS credentials are needed: terraform init runs without a
+# backend and validate never calls AWS APIs. The Terraform provider lock is enforced
+# (-lockfile=readonly) and carries hashes for linux/darwin/windows on amd64/arm64, so a
+# clean Linux runner installs the exact pinned providers. The python job runs the unit
+# tests (fakes, no AWS access) and ruff; the secrets and sast jobs run detect-secrets and
+# bandit.
+#
+# Supply-chain hygiene: every third-party action is pinned to a full commit SHA with the
+# release tag in a trailing comment. The Python tools (pytest, ruff, bandit, detect-secrets,
+# pip-audit) are installed from the hash-locked requirements-dev.txt (--require-hashes);
+# checkov is pinned to an exact version.
+#
+# ASH (Automated Security Helper) is NOT run here: its CLI is installed from the awslabs
+# GitHub repo/container and pulls checkov, bandit, semgrep, grype and syft, which is heavy
+# for CI. Run it locally with the command documented in .ash/.ash.yaml.
+name: checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    env:
+      TF_IN_AUTOMATION: "true"
+      TF_INPUT: "false"
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+        with:
+          terraform_version: 1.13.4
+          terraform_wrapper: false
+      - run: terraform fmt -check -recursive -diff terraform
+      - run: terraform -chdir=terraform/envs/demo init -backend=false -lockfile=readonly
+      - run: terraform -chdir=terraform/envs/demo validate
+
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.13"
+      - run: pip install --quiet --require-hashes -r requirements-dev.txt
+      - run: ruff check .
+      - run: ruff format --check .
+      - run: python -m pytest -q
+
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.13"
+      - run: pip install --quiet --require-hashes -r requirements-dev.txt
+      # Every tracked file. The job fails on any result; a test fixture that only looks like a
+      # secret carries an inline `# pragma: allowlist secret` with its reason.
+      - run: |
+          git ls-files -z | xargs -0 detect-secrets scan > detect-secrets.json
+          python -c "import json,sys; r=json.load(open('detect-secrets.json'))['results']; print(json.dumps(r, indent=1)); sys.exit(1 if r else 0)"
+
+  sast:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.13"
+      - run: pip install --quiet --require-hashes -r requirements-dev.txt
+      # B101 (assert) is skipped: pytest asserts by design. Accepted findings carry `# nosec <id>`
+      # with the reason next to the code.
+      - run: bandit -q -r src scripts terraform tests -s B101
+
+  checkov:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.13"
+      # Pinned version so the gate is reproducible. Inline #checkov:skip comments next to
+      # each resource carry the reason for every accepted finding.
+      - run: pip install --quiet checkov==3.3.29
+      - run: checkov --directory terraform --quiet --compact
+
+  pip-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.13"
+      - run: pip install --quiet --require-hashes -r requirements-dev.txt
+      # Audit the hash-locked dependency sets. --require-hashes refuses any requirement
+      # without a hash, so the lock stays enforced. The MCP set is compiled for aarch64 (the
+      # AgentCore Runtime platform); --disable-pip --no-deps audits it by hash without asking
+      # pip to resolve or install wheels for the x86 CI runner. Same flags as the README dev loop.
+      - run: pip-audit --strict --require-hashes --disable-pip --no-deps -r src/layers/boto3/requirements.txt
+      - run: pip-audit --strict --require-hashes --disable-pip --no-deps -r src/mcp_server/requirements.txt
+      - run: pip-audit --strict --require-hashes --disable-pip --no-deps -r requirements-dev.txt
