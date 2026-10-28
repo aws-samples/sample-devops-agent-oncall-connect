@@ -2,6 +2,13 @@
 
 All notable changes to this sample are documented in this file.
 
+## Unreleased
+
+- README: plain-language opening in four steps, a silent teaser GIF (`docs/teaser.gif`), and a
+  How it works section with a simple flowchart and a step-by-step sequence diagram (Mermaid).
+- Docs and architecture diagram: name the on-call number, email and PIN store as Parameter Store
+  `SecureString` (official Parameter Store icon) instead of "SSM SecureString". No resource change.
+
 ## 0.1.0: Initial release
 
 - A CloudWatch alarm opens a ticket and an AWS DevOps Agent investigation; when the investigation

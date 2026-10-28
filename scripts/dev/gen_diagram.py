@@ -35,8 +35,9 @@ def vertex(label, style, x, y, w, h):
     return i
 
 
-def icon(label, res, color, x, y, side="bottom"):
-    """AWS resource icon. side='top', 'left' or 'right' keeps the label off the arrows."""
+def icon(label, res, color, x, y, side="bottom", resource=False):
+    """AWS service icon, or resource icon when resource=True (draw.io shape mxgraph.aws4.<res>).
+    side='top', 'left' or 'right' keeps the label off the arrows."""
     if side == "bottom":
         pos = "verticalLabelPosition=bottom;verticalAlign=top;align=center;"
     elif side == "top":
@@ -45,11 +46,12 @@ def icon(label, res, color, x, y, side="bottom"):
         pos = "labelPosition=left;verticalLabelPosition=middle;align=right;verticalAlign=middle;spacingRight=4;"
     else:
         pos = "labelPosition=right;verticalLabelPosition=middle;align=left;verticalAlign=middle;spacingLeft=4;"
-    style = (
-        f"sketch=0;outlineConnect=0;fontColor=#232F3E;fillColor={color};strokeColor=#ffffff;dashed=0;"
-        f"{pos}html=1;fontSize=11;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;"
-        f"resIcon=mxgraph.aws4.{res};"
+    shape = (
+        f"shape=mxgraph.aws4.{res};pointerEvents=1;strokeColor=none;"
+        if resource
+        else (f"shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.{res};strokeColor=#ffffff;")
     )
+    style = f"sketch=0;outlineConnect=0;fontColor=#232F3E;fillColor={color};dashed=0;{pos}html=1;fontSize=11;fontStyle=0;aspect=fixed;{shape}"
     return vertex(label, style, x, y, 48, 48)
 
 
@@ -129,7 +131,7 @@ mcp = box("Ticketing MCP server\nAgentCore Runtime (SigV4)", DX + 700, 305, 150,
 # Rows 3-4: investigation events -> caller
 eb2 = icon("EventBridge rule\n(investigation end,\nHIGH / CRITICAL)", "eventbridge", PINK, DX + 541, 450, side="right")
 caller = icon("caller Lambda\n(reads the summary)", "lambda", ORANGE, DX + 541, 620)
-ssm = icon("SSM SecureString\n(on-call number, also\nthe SMS destination)", "systems_manager", PINK, DX + 380, 620)
+ssm = icon("Parameter Store SecureString\n(on-call number, also\nthe SMS destination)", "parameter_store", PINK, DX + 380, 620, resource=True)
 dlq = icon("SQS on-failure\nqueue + DLQ", "sqs", PINK, DX + 380, 470)
 # Optional replay path (enable_replay): its own bus, PutEvents denied to all but the deployer.
 replay = icon("EventBridge replay bus\n(optional, deployer-only\nPutEvents)", "eventbridge", PINK, DX + 760, 560, side="top")
@@ -158,7 +160,7 @@ bedrock = icon("Amazon Bedrock", "bedrock", GREEN, DX + 1300, 340)
 polly = icon("Amazon Polly\n(Lex voice)", "polly", GREEN, DX + 1300, 460)
 sms = icon("End User Messaging\nSMS (optional)", "pinpoint", RED, DX + 1220, 150)
 ses = icon("Amazon SES\n(optional, TLS)", "simple_email_service", RED, DX + 1300, 230)
-ssm_b = icon("SSM SecureString\n(email, PIN; optional)", "systems_manager", PINK, DX + 940, 215)
+ssm_b = icon("Parameter Store SecureString\n(email, PIN; optional)", "parameter_store", PINK, DX + 940, 215, resource=True)
 eb3 = icon("EventBridge rule\n(contact DISCONNECTED)", "eventbridge", PINK, DX + 940, 500)
 unanswered = icon("SQS unanswered queue\n(delay) + DLQ", "sqs", PINK, DX + 940, 335, side="top")
 connect = icon("Amazon Connect\n(outbound call, recording)", "connect", RED, DX + 1081, 620)
