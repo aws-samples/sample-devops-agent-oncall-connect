@@ -1,14 +1,24 @@
 # AWS DevOps Agent on-call calls with Amazon Connect
 
-This sample shows two patterns around [AWS DevOps Agent](https://aws.amazon.com/devops-agent/):
+<p align="center">
+  <img src="docs/teaser.gif" width="360"
+       alt="Teaser: a CloudWatch alarm opens a HIGH ticket, AWS DevOps Agent finds the cause, Amazon Connect calls the on-call engineer who takes the incident by voice, then the ticket is closed from the DevOps Agent chat through the custom MCP server after an approval">
+</p>
 
-1. **A custom MCP server**: the operator reads and updates the incident ticket from the DevOps Agent
-   chat, through a ticketing MCP server on Amazon Bedrock AgentCore Runtime. Every write needs a
-   human approval.
-2. **An on-call call at the end of the investigation**: a CloudWatch alarm opens a ticket and an
-   investigation; when the investigation ends, Amazon Connect calls the on-call engineer. A Connect
-   AI agent summarizes what DevOps Agent found, answers questions, and acknowledges the ticket
-   when the engineer says they take the incident.
+When production breaks, [AWS DevOps Agent](https://aws.amazon.com/devops-agent/) investigates and
+Amazon Connect phones the on-call engineer with what it found. In short:
+
+1. A CloudWatch alarm fires. A ticket opens and AWS DevOps Agent starts an investigation.
+2. When the investigation ends on a HIGH or CRITICAL incident, Amazon Connect calls the on-call
+   engineer.
+3. The engineer presses 1 (and enters a PIN if enabled). A Connect AI agent explains what DevOps
+   Agent found and answers questions.
+4. The engineer says they take the incident, and the ticket is acknowledged. If nobody takes the
+   call, the ticket is commented and an optional SMS and/or email is sent.
+
+The sample also adds a **custom MCP server** to DevOps Agent: from the DevOps Agent chat, the
+operator reads and updates the same ticket through a ticketing MCP server on Amazon Bedrock
+AgentCore Runtime. Every write needs a human approval.
 
 Everything is deployed with Terraform (`hashicorp/aws` and `hashicorp/awscc`).
 
@@ -18,6 +28,60 @@ Everything is deployed with Terraform (`hashicorp/aws` and `hashicorp/awscc`).
 > creates billable resources and places real phone calls (see [Costs](#costs)). Read
 > [Security considerations](#security-considerations) before calling real people: a pilot with
 > real on-call staff needs a dedicated AWS account.
+
+## How it works
+
+```mermaid
+flowchart LR
+    A["CloudWatch alarm<br/>ticket opened"] --> B["AWS DevOps Agent<br/>investigates"]
+    B --> C["Amazon Connect<br/>calls the on-call engineer<br/>(HIGH / CRITICAL)"]
+    C --> D{"Engineer<br/>presses 1?"}
+    D -- yes --> E["Connect AI agent<br/>explains, answers"]
+    E --> F["Engineer takes it<br/>ticket acknowledged"]
+    D -- "no, or no answer" --> G["Ticket commented<br/>SMS / email fallback"]
+    O["Operator in the<br/>DevOps Agent chat"] -. "custom MCP server<br/>writes need approval" .-> T[("Ticket")]
+```
+
+<details>
+<summary>Step by step</summary>
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant CW as CloudWatch alarm
+    participant T as Ticket (DynamoDB)
+    participant DA as AWS DevOps Agent
+    participant C as Amazon Connect
+    actor E as On-call engineer
+    actor O as Operator
+
+    CW->>T: alarm fires, ticket OPEN
+    CW->>DA: start an investigation
+    DA-->>DA: investigates, finds the cause
+    DA->>C: investigation ends (HIGH / CRITICAL): call the on-call engineer
+    C->>E: phone call, "press 1"
+    alt engineer presses 1
+        opt PIN enabled
+            E->>C: enters the on-call PIN
+        end
+        C->>E: Connect AI agent summarizes the findings, answers questions
+        E->>C: "I take it"
+        C->>T: ACKNOWLEDGED
+    else 1 not pressed, or call not answered
+        C->>T: comment "not acknowledged"
+        C->>E: optional SMS and/or email
+    end
+    O->>DA: chat: "close the ticket"
+    DA->>T: read the ticket (ticketing MCP server, no approval)
+    DA->>O: ask approval to write
+    O->>DA: approve
+    DA->>T: CLOSED
+```
+
+Steps 1 to 11 are the on-call call. The last steps are the custom MCP server pattern: DevOps Agent
+reads the ticket freely, and every write waits for the operator's approval in the chat.
+
+</details>
 
 ## Architecture
 
@@ -112,7 +176,7 @@ default provider Region) and the Connect Region (`connect_region`). Where each s
 | Amazon Connect instance and the outbound call | Connect Region | Pick it for the country of the on-call number (see the allow-list below). |
 | Connect AI agents (Amazon Q in Connect) | Connect Region | The instance must support AI agents (Amazon Connect Customer tier); confirm AI agents are available in your Connect Region (see [Enable AI agents](https://docs.aws.amazon.com/connect/latest/adminguide/enable-q.html) and the [Amazon Connect endpoints and quotas](https://docs.aws.amazon.com/general/latest/gr/connect-service.html)). |
 | Amazon Bedrock model and inference profile | Connect Region's geography | The Connect AI agent reaches Claude Haiku 4.5 through the cross-Region inference profile whose prefix matches the Connect Region's geography (`eu.`, `us.` or `apac.`). A geography-tied profile routes to several Regions inside that geography; the exact source and destination Regions are listed per profile on the [supported cross-Region inference profiles](https://docs.aws.amazon.com/bedrock/latest/userguide/inference-profiles-support.html) page, confirm them for your geography. The cross-Region inference profile routing and the geography-prefix rule are documented in [Increase throughput with cross-Region inference](https://docs.aws.amazon.com/bedrock/latest/userguide/cross-region-inference.html). |
-| AWS End User Messaging SMS origination identity | Connect Region | Optional notification channel. SMS and the SSM parameter live next to `connect-handler`. |
+| AWS End User Messaging SMS origination identity | Connect Region | Optional notification channel. SMS and the Parameter Store parameter live next to `connect-handler`. |
 | Amazon SES verified sender | Connect Region | Optional notification channel. SES is available in the common Connect Regions (verified: eu-central-1, eu-west-2, us-east-1, us-west-2 among others). |
 
 The boto3 Lambda layer is built and published in the Connect Region and attached to
@@ -471,7 +535,8 @@ The threats behind these choices are in [docs/threat-model.md](docs/threat-model
   without a retention period (see Clean up and [docs/terraform.md](docs/terraform.md#gotchas)).
   The MCP code bucket uses SSE-KMS with the same key, blocks public access and denies non-TLS
   requests; every SQS queue denies non-TLS requests.
-- **On-call number**: SSM `SecureString`, set outside Terraform (`ignore_changes`), masked in logs.
+- **On-call number**: Parameter Store `SecureString` (customer managed KMS key), set outside
+  Terraform (`ignore_changes`), masked in logs.
   Terraform reads the decrypted value back into state on refresh, so treat the state as
   sensitive (encrypted remote backend, never commit or share it). Calls and the no-answer SMS
   only go to that number, never to a number taken from an event or a contact.
@@ -495,7 +560,7 @@ The threats behind these choices are in [docs/threat-model.md](docs/threat-model
   workload is only invoked through the Lambda API. The `caller`, `connect-handler` and MCP runtime
   roles use inline policies
   scoped to the resources they touch (their own log group, the ticket table, the specific Connect
-  and SSM ARNs). The `meter-api` workload and `incident-opener` functions also write logs only to
+  and Parameter Store ARNs). The `meter-api` workload and `incident-opener` functions also write logs only to
   their own log group (`CreateLogStream`, `PutLogEvents`, no `CreateLogGroup`). All four functions
   attach the managed `AWSXRayDaemonWriteAccess` (X-Ray has no
   resource type). Grants that stay on `Resource = "*"` because the action has no resource type in
@@ -531,7 +596,7 @@ The threats behind these choices are in [docs/threat-model.md](docs/threat-model
 - **Optional PIN gate.** With `enable_pin = true` the flow asks for a DTMF PIN after the engineer
   presses 1 and before the AI agent says anything about the incident; the opening message then gives
   the priority only, not the service. `connect-handler` compares the digits in constant time with
-  the SSM SecureString `/<prefix>/oncall-pin` (set outside Terraform, like the on-call number; read
+  the Parameter Store `SecureString` `/<prefix>/oncall-pin` (set outside Terraform, like the on-call number; read
   back into state on refresh). Two wrong PINs lead to the no-answer path. The PIN is never logged,
   but Connect flow logs record Lambda parameters: keep `enable_flow_logging = false` with the PIN on.
   `enable_pin` is `false` by default, so whoever answers the phone hears the summary after pressing 1.
@@ -578,7 +643,7 @@ done so the number stops billing.
 ## Clean up
 
 `terraform destroy` in `terraform/envs/demo` removes everything this project created, including the
-SSM parameters and, on a supplied Connect instance, the contact flow and the assistant, Lex bot
+Parameter Store parameters and, on a supplied Connect instance, the contact flow and the assistant, Lex bot
 and Lambda function associations it added. The Agent Space is not managed by this
 project, nor is an existing Connect instance. An instance created with `create_connect_instance =
 true` is deleted with its claimed number (released numbers cannot be claimed back), its flow log

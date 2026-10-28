@@ -104,7 +104,7 @@ variable "sms_origination_identity_arn" {
   default     = null
 }
 variable "notify_email_from" {
-  description = "SES verified sender address (not a bare domain) for the no-answer email. null = no email. Recipient: SSM SecureString output oncall.oncall_email_param, set outside IaC"
+  description = "SES verified sender address (not a bare domain) for the no-answer email. null = no email. Recipient: Parameter Store SecureString output oncall.oncall_email_param, set outside IaC"
   type        = string
   default     = null
   validation {

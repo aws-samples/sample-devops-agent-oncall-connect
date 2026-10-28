@@ -26,7 +26,7 @@ terraform/
 | `foundation` | DevOps Agent Region | `meter-api` Lambda, CloudWatch alarm, DynamoDB tickets table, `incident-opener` Lambda (one incident per alarm until its ticket is CLOSED: lock item `ALARM#<name>`), EventBridge rules, event archive log group |
 | `mcp-ticketing` | DevOps Agent Region | `aws_bedrockagentcore_agent_runtime`, runtime and DEFAULT endpoint resource policies, IAM roles, `awscc_devopsagent_service`, `awscc_devopsagent_association`, `terraform_data` (classification, optional trust narrowing) |
 | `connect-instance` | Connect Region | `aws_connect_instance`, `aws_connect_phone_number`, flow log group `/aws/connect/<alias>`, recordings S3 bucket + `aws_connect_instance_storage_config` (`CALL_RECORDINGS`). Created only with `create_connect_instance = true` |
-| `oncall` | both | DevOps Agent Region (`caller.tf`): EventBridge rule on `aws.aidevops`, `caller` Lambda, target DLQ, on-failure queue, SSM `SecureString`. Connect Region: `awscc_wisdom_assistant` + association (`assistant.tf`), `awscc_wisdom_ai_prompt` and `awscc_wisdom_ai_agent` with their versions (`agent.tf`), Lex bot as `aws_cloudformation_stack` (`lex.tf`), `connect-handler` Lambda, optional `/<prefix>/oncall-email` SSM `SecureString`, EventBridge rule on Connect contact events for unanswered calls (`handler.tf`), `aws_connect_contact_flow` (`flow.tf`) |
+| `oncall` | both | DevOps Agent Region (`caller.tf`): EventBridge rule on `aws.aidevops`, `caller` Lambda, target DLQ, on-failure queue, Parameter Store `SecureString`. Connect Region: `awscc_wisdom_assistant` + association (`assistant.tf`), `awscc_wisdom_ai_prompt` and `awscc_wisdom_ai_agent` with their versions (`agent.tf`), Lex bot as `aws_cloudformation_stack` (`lex.tf`), `connect-handler` Lambda, optional `/<prefix>/oncall-email` Parameter Store `SecureString`, EventBridge rule on Connect contact events for unanswered calls (`handler.tf`), `aws_connect_contact_flow` (`flow.tf`) |
 
 ## Inputs
 
@@ -117,7 +117,7 @@ bus policy lets only the deployer principals publish to it), `deletion_protectio
 by the local scripts). The
 `oncall` module also takes `model_id` (default: Claude Haiku 4.5 profile of the Connect Region).
 
-The on-call number and email are never Terraform inputs: the SSM parameters are created with a
+The on-call number and email are never Terraform inputs: the Parameter Store parameters are created with a
 placeholder and `ignore_changes = [value]`, and you set the real values with `aws ssm put-parameter`.
 `ignore_changes = [value]` stops Terraform overwriting the externally-set value; it does not keep
 the value out of state. On refresh the AWS provider reads the parameter and persists the decrypted
@@ -130,7 +130,7 @@ value in state, so treat the state file as sensitive: use the encrypted S3 backe
 |:--|:--|:--|
 | Agent Space and its account association | created in the DevOps Agent console | input |
 | Connect instance, phone number | shared, usually owned by another team; or created by `modules/connect-instance` | inputs or `create_connect_instance` |
-| On-call number and email values | keep them out of code and out of Terraform inputs; set by hand so a redeploy does not overwrite them (Terraform still reads them back into state on refresh, so treat state as sensitive) | SSM, set by hand |
+| On-call number and email values | keep them out of code and out of Terraform inputs; set by hand so a redeploy does not overwrite them (Terraform still reads them back into state on refresh, so treat state as sensitive) | Parameter Store, set by hand |
 | DevOps Agent investigation | created at runtime by the `incident-opener` Lambda (`CreateBacklogTask`) | Lambda code |
 | AgentCore Runtime log groups | created by the runtime on first invocation | see gotchas |
 | Connect flow log group of an existing instance | created by Connect (`/aws/connect/<alias>`); managed by Terraform only for a new instance | delete by hand |
