@@ -46,13 +46,12 @@ def icon(label, res, color, x, y, side="bottom", resource=False):
         pos = "labelPosition=left;verticalLabelPosition=middle;align=right;verticalAlign=middle;spacingRight=4;"
     else:
         pos = "labelPosition=right;verticalLabelPosition=middle;align=left;verticalAlign=middle;spacingLeft=4;"
-    shape = f"shape=mxgraph.aws4.{res};pointerEvents=1;strokeColor=none;" if resource else (
-        f"shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.{res};strokeColor=#ffffff;"
+    shape = (
+        f"shape=mxgraph.aws4.{res};pointerEvents=1;strokeColor=none;"
+        if resource
+        else (f"shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.{res};strokeColor=#ffffff;")
     )
-    style = (
-        f"sketch=0;outlineConnect=0;fontColor=#232F3E;fillColor={color};dashed=0;"
-        f"{pos}html=1;fontSize=11;fontStyle=0;aspect=fixed;{shape}"
-    )
+    style = f"sketch=0;outlineConnect=0;fontColor=#232F3E;fillColor={color};dashed=0;{pos}html=1;fontSize=11;fontStyle=0;aspect=fixed;{shape}"
     return vertex(label, style, x, y, 48, 48)
 
 
